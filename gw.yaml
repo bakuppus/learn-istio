@@ -1,0 +1,59 @@
+[ec2-user@ip-172-31-47-240 istio]$ cat gateway.yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: nginx-system-gateway
+  namespace: istio-system
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "ng1.kubelancer.net"
+    tls:
+      httpsRedirect: true
+  - port:
+      number: 443
+      name: https-443
+      protocol: HTTP
+    hosts:
+    - "ng1.kubelancer.net"
+[ec2-user@ip-172-31-47-240 istio]$ cat vs.yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: nginx-system-vs
+  namespace: nginx-system
+spec:
+  hosts:
+    - "ng1.kubelancer.net"
+  gateways:
+    - istio-system/nginx-system-gateway
+  http:
+  - route:
+    - destination:
+        host: kubia-service
+        port:
+          number: 80
+    headers:
+      request:
+        set:
+          x-forwarded-proto: https
+          x-forwarded-port: "443"
+[ec2-user@ip-172-31-47-240 istio]$ cat patch.sh 
+kubectl -n istio-system patch service istio-ingressgateway --patch "$(cat<<EOF
+metadata:
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: arn:aws:acm:us-east-2:604110196984:certificate/afe6ab64-15f6-43b1-ad97-976257df694b
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: tcp
+    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "https"
+    service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout: "3600"
+EOF
+)"
+
+
+[ec2-user@ip-172-31-47-240 istio]$ 
